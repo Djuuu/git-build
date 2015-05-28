@@ -27,9 +27,9 @@ OR
 
 ### Build Configuration
  
-Create a config file for your build in the `.git/` directory of your project, named `build-<BUILDNAME>.conf`
+Create a config file named `.gitbuild-<BUILDNAME>` in your project. 
 
-eg: `build-preprod.conf`
+eg: `.gitbuild-preprod`
 
 The file shoud contain the following : 
 
