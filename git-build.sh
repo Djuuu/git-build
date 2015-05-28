@@ -1,83 +1,190 @@
 #!/bin/sh
 
-branches[0]=evo-bo-depot-primaire
-branches[1]=bo-planif-anterieure
-branches[2]=retards-partenaires
-branches[3]=evo-bo-80
-branches[4]=evos_bo_2015_03
-branches[5]=bo-menu
+############################################################################
+# flags, vars
+
+continue=0
+current_branch=
+current_build=
+
+origin_remote=origin
+
+git_build_current_branch_file=".git/GIT_BUILD_CURRENT_BRANCH"
+git_build_current_build_file=".git/GIT_BUILD_CURRENT_BUILD"
 
 ############################################################################
+# functions
 
-destination=PREPROD
-dest_remote=preprod
+usage()
+{
+    echo
+    cat << EOF
+usage: $0 [<build-name>|--continue]
+EOF
+    echo
+}
 
-orig_remote=origin
+load_remote_conf()
+{
+    if [ -z $current_build ]; then
+        echo "Git Build - No remote specified"
+        usage
+        exit 1;
+    fi
 
-merge_conflict_branch=".git/MERGE_CONFLICT_BRANCH"
+    local remote_conf_file=".git/build-${current_build}.conf"
 
-############################################################################
+    if [ ! -f $remote_conf_file ]; then
+        echo "Git Build - Config file $remote_conf_file not found"
+        exit 1
+    fi
 
-# flags
+    source $remote_conf_file
 
-skip_previous_branches=0
-conflict_msg=""
-conflict_branch=""
+    if [ -z $build_branches ]; then
+        echo "Git Build - build_branches is empty. Check $remote_conf_file conf"
+        exit 2
+    fi
 
-# "continue" mode
-if [ "$1" == "--continue" ]; then
-    skip_previous_branches=1
-    conflict_msg=`cat .git/MERGE_MSG`
-    conflict_branch=`cat $merge_conflict_branch`
-fi
+    if [ -z $build_branch ]; then
+        echo "Git Build - build_branch is empty. Check $remote_conf_file conf"
+        exit 2
+    fi
 
+    echo "Git Build - branch to build   : $build_branch"
+    echo "Git Build - branches to merge : "
+    for i in "${build_branches[@]}"
+    do
+        echo "   - $i"
+    done
+    echo
+}
 
-# Check repository state
-if [ "$skip_previous_branches" == "0" ]; then
+init_normal()
+{
+    echo "Git Build - Init new build"
+    echo
+
+    # Check repository state
     if [ ! -z "$(git status --untracked-files=no --porcelain)" ]; then
         echo "Repository is not clean, exiting"
         exit 1
     fi
-fi
 
-# Check current checked out branch
-current_branch=$(git symbolic-ref --short -q HEAD)
-if [ "$current_branch" != "$destination" ]; then
-    git checkout $destination
+    current_build=$1
+}
+
+init_continue()
+{
+    echo "Git Build - Continue previous build"
+    echo
+
+    continue=1
+
+    # Check / get cached configuration
+
+    local running=
+    if [ ! -f $git_build_current_branch_file ]; then
+        running=1
+    fi
+    if [ ! -f $git_build_current_build_file ]; then
+        running=1
+    fi
+
+    if [ ! -z $running ]; then
+        echo "Git Build - No build seems to be running"
+        usage
+        exit 2;
+    fi
+
+    current_branch=`cat $git_build_current_branch_file`
+    current_build=`cat $git_build_current_build_file`
+}
+
+dump_current_build()
+{
+    echo $i            > $git_build_current_branch_file
+    echo $current_build > $git_build_current_build_file
+}
+
+clean_current_build()
+{
+    rm -f $git_build_current_branch_file
+    rm -f $git_build_current_build_file
+}
+
+init()
+{
+    if [ ! -d ".git" ]; then
+        echo "Git Build - Not a Git repository"
+        exit 1
+    fi
+
+    if [ "$1" == "--continue" ]; then
+        init_continue
+    else
+        init_normal $1
+    fi
+
+    load_remote_conf
+}
+
+############################################################################
+# script
+
+
+init $1
+
+
+if [ "$continue" != "1" ]; then
+    # Check current checked out branch
+    current_branch=$(git symbolic-ref --short -q HEAD)
+    if [ "$current_branch" != "$build_branch" ]; then
+        echo "Git Build - Current branch : $current_branch ; Checking out $build_branch"
+        git checkout -f $build_branch
+        echo
+    fi
+
+    echo "Git Build - resetting to master"
     git reset --hard origin/master
     echo
 fi
 
 
 # Merge
-for i in "${branches[@]}"
+for i in "${build_branches[@]}"
 do
-    message="Merge branch '$i' into $destination"
+    message="Merge branch '$i' into $build_branch"
 
-    if [ "$skip_previous_branches" == "1" ]; then
+    if [ "$continue" == "1" ]; then
 
-        if [ "$conflict_branch" == "$i" ]; then
+        if [ "$current_branch" == "$i" ]; then
             # Commit (conflict resolution
-            echo "$message  (conflict resolution)"
+            echo "Git Build - $message  (conflict resolution)"
 
-            git commit -m "$conflict_msg"
+            git commit -m "$(cat .git/MERGE_MSG)"
 
-            skip_previous_branches=0
-            rm -f $merge_conflict_branch
+            if [ $? -ne 0 ]; then
+                dump_current_build
+                exit 1;
+            fi
+
+            continue=0
+            clean_current_build
             echo
         else
-            # Slpi (already merged)
-            echo "skipping branch $i"
+            # Skip (already merged)
+            echo "Git Build - skipping branch $i"
             echo
         fi
     else
         # Merge
-        echo "$message"
+        echo "Git Build - $message"
 
         git merge origin/$i -m "$message"
 
         if [ $? -ne 0 ]; then
-            echo $i > $merge_conflict_branch
+            dump_current_build
             exit 1;
         fi
 
@@ -86,11 +193,10 @@ do
 done
 
 echo
-echo "Merge OK. You can probably do : "
+echo "Git Build - Merge OK. You can probably do : "
 echo
-echo "  git push $orig_remote       :$destination"
-echo "  git push $dest_remote       :$destination"
+echo "  git push $origin_remote :$build_branch"
+echo "  git push $current_build :$build_branch"
 echo
-echo "  git push $orig_remote        $destination"
+echo "  git push $origin_remote $build_branch"
 echo
-
