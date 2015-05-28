@@ -1,0 +1,18 @@
+### PhpStorm ###
+.idea/
+.idea_modules/
+
+### Eclipse ###
+.metadata
+local.properties
+.settings/
+.loadpath
+.buildpath
+.project
+
+### NetBeans ###
+nbproject/
+nbbuild/
+nbdist/
+nbactions.xml
+nb-configuration.xml
