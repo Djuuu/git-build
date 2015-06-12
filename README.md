@@ -12,7 +12,7 @@ It can be used to build a new *release candidate* composed of several branches, 
 Then : 
 * Create a symlink to the script in a directory in your path
 ```bash
-ln -s /path/to/KC-git-build/git-build.sh ~/bin/git-build
+ln -s /path/to/git-build/git-build.sh ~/bin/git-build
 ```
 
 OR
@@ -20,7 +20,7 @@ OR
 * Create a git alias in your `.gitconfig`
 ```ini
 [alias]
-    build = "!bash /path/to/KC-git-build/git-build.sh
+    build = "!bash /path/to/git-build/git-build.sh
 ```
 
 ## Usage
