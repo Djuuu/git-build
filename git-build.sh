@@ -32,7 +32,7 @@ load_remote_conf()
         exit 1;
     fi
 
-    local remote_conf_file=".gitbuild-${current_build}"
+    local remote_conf_file="./.gitbuild-${current_build}"
 
     if [ ! -f $remote_conf_file ]; then
         echo "Git Build - Config file $remote_conf_file not found"
