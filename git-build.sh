@@ -8,6 +8,7 @@ current_branch=
 current_build=
 
 origin_remote=origin
+starting_point=master
 
 git_build_current_branch_file=".git/GIT_BUILD_CURRENT_BRANCH"
 git_build_current_build_file=".git/GIT_BUILD_CURRENT_BUILD"
@@ -146,7 +147,7 @@ if [ "$continue" != "1" ]; then
     fi
 
     echo "Git Build - resetting to master"
-    git reset --hard origin/master
+    git reset --hard $starting_point
     echo
 fi
 
@@ -181,7 +182,7 @@ do
         # Merge
         echo "Git Build - $message"
 
-        git merge origin/$i -m "$message"
+        git merge $origin_remote/$i -m "$message"
 
         if [ $? -ne 0 ]; then
             dump_current_build
